@@ -1,9 +1,10 @@
-from django.db import models
 from django.contrib.auth.models import User
-
-from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from django.utils import timezone
+
+from .fields import OrderField
 
 
 # Create your models here.
@@ -43,9 +44,13 @@ class Module(models.Model):
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    order = OrderField(blank=True, for_fields=["course"], default=0)
+
+    class Meta:
+        ordering = ["order"]
 
     def __str__(self):
-        return self.title
+        return f"{self.order}. {self.title}"
 
 
 # Creating models for polymorphic content
@@ -53,9 +58,17 @@ class Content(models.Model):
     module = models.ForeignKey(
         Module, related_name="contents", on_delete=models.CASCADE
     )
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        limit_choices_to={"model__in": ("text", "video", "image", "file")},
+    )
     object_id = models.PositiveIntegerField()
     item = GenericForeignKey("content_type", "object_id")
+    order = OrderField(blank=True, for_fields=["module"], default=0)
+
+    class Meta:
+        ordering = ["order"]
 
 
 # Abstract models
@@ -93,7 +106,7 @@ class OrderedContent(BaseContent):
         ordering = ["created"]
 
     def created_delta(self):
-        return timezone.now() - self.created
+        return timezone.now - self.created
 
 
 # Creating the Content models
